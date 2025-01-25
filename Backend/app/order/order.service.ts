@@ -1,88 +1,111 @@
+import CartModel from "../cart/cart.schema";
 import OrderModel from "./order.schema";
 import { OrderStatus } from "./order.dto";
+import { IOrderItem } from "./order.dto";
 
 /**
- * Creates a new order for a user.
- * @async
- * @param {string} userId - The ID of the user placing the order.
- * @param {any[]} items - The list of items in the order.
- * @param {number} totalAmount - The total amount of the order.
- * @param {string} shippingAddress - The shipping address for the order.
- * @returns {Promise<any>} - A promise that resolves to the created order.
+ * Create Order from Cart
+ * @param {string} userId - ID of the user
+ * @param {string} shippingAddress - Address where the order needs to be shipped
+ * @returns {Promise<any>} - The created order
  */
-export const createOrder = async (
-  userId: string,
-  items: any[],
-  totalAmount: number,
-  shippingAddress: string
-) => {
+export const createOrderFromCart = async (userId: string, shippingAddress: string) => {
+  const cart = await CartModel.findOne({ userId }).populate("items.productId");
+
+  if (!cart) {
+    throw new Error("Cart not found for user");
+  }
+
+  const orderItems: IOrderItem[] = cart.items.map(item => ({
+    productId: item.productId as any, // Ensure this is the populated product object
+    quantity: item.quantity,
+    price: item.productPrice,
+  }));
+
+  const totalAmount = cart.totalPrice;
+
   const newOrder = new OrderModel({
     user: userId,
-    items,
+    items: orderItems,
     totalAmount,
-    shippingAddress,
     status: OrderStatus.PENDING,
+    shippingAddress,
+    createdAt: new Date(),
+    updatedAt: new Date(),
   });
 
-  return await newOrder.save();
+  await newOrder.save();
+
+  return newOrder;
 };
 
 /**
- * Fetches a specific order by its ID for a user.
- * @async
- * @param {string} userId - The ID of the user.
- * @param {string} orderId - The ID of the order to fetch.
- * @returns {Promise<any | null>} - A promise that resolves to the order or null if not found.
+ * Get Order by ID
+ * @param {string} userId - ID of the user
+ * @param {string} orderId - ID of the order
+ * @returns {Promise<any>} - The order object
  */
 export const getOrderById = async (userId: string, orderId: string) => {
-  return await OrderModel.findOne({ _id: orderId, user: userId });
+  const order = await OrderModel.findOne({ _id: orderId, user: userId })
+    .populate("items.productId");
+
+  return order;
 };
 
 /**
- * Fetches all orders for a user.
- * @async
- * @param {string} userId - The ID of the user.
- * @returns {Promise<any[]>} - A promise that resolves to an array of orders.
+ * Get All Orders
+ * @param {string} userId - ID of the user
+ * @returns {Promise<any[]>} - Array of orders for the user
  */
 export const getAllOrders = async (userId: string) => {
-  return await OrderModel.find({ user: userId });
+  const orders = await OrderModel.find({ user: userId })
+    .populate("items.productId", "name price");
+  return orders;
 };
 
 /**
- * Updates the status of an order.
- * @async
- * @param {string} orderId - The ID of the order to update.
- * @param {OrderStatus} status - The new status of the order.
- * @returns {Promise<any | null>} - A promise that resolves to the updated order or null if not found.
- */
-export const updateOrderStatus = async (orderId: string, status: OrderStatus) => {
-  return await OrderModel.findByIdAndUpdate(
-    orderId,
-    { status, updatedAt: new Date() },
-    { new: true }
-  );
-};
-
-/**
- * Deletes a specific order for a user.
- * @async
- * @param {string} userId - The ID of the user.
- * @param {string} orderId - The ID of the order to delete.
- * @returns {Promise<boolean>} - A promise that resolves to true if the order was deleted, false otherwise.
+ * Delete Order
+ * @param {string} userId - ID of the user
+ * @param {string} orderId - ID of the order
+ * @returns {Promise<boolean>} - Whether the order was successfully deleted
  */
 export const deleteOrder = async (userId: string, orderId: string) => {
-  const result = await OrderModel.findOneAndDelete({ _id: orderId, user: userId });
-  return result !== null;
+  const result = await OrderModel.deleteOne({ _id: orderId, user: userId });
+  return result.deletedCount > 0;
 };
 
 /**
- * Fetches the status of a specific order for a user.
- * @async
- * @param {string} userId - The ID of the user.
- * @param {string} orderId - The ID of the order.
- * @returns {Promise<OrderStatus | null>} - A promise that resolves to the status of the order or null if not found.
+ * Get Order Status
+ * @param {string} userId - ID of the user
+ * @param {string} orderId - ID of the order
+ * @returns {Promise<string | null>} - The status of the order or null if not found
  */
 export const getOrderStatus = async (userId: string, orderId: string) => {
-  const order = await OrderModel.findOne({ _id: orderId, user: userId });
+  const order = await OrderModel.findOne({ _id: orderId, user: userId }, "status");
   return order ? order.status : null;
+};
+
+/**
+ * Update Order Status
+ * @param {string} orderId - ID of the order
+ * @param {OrderStatus} status - New status to be updated
+ * @returns {Promise<any>} - The updated order object
+ */
+export const updateOrderStatus = async (orderId: string, status: OrderStatus) => {
+  const order = await OrderModel.findById(orderId);
+
+  if (!order) {
+    throw new Error("Order not found");
+  }
+
+  if (!Object.values(OrderStatus).includes(status)) {
+    throw new Error("Invalid order status");
+  }
+
+  order.status = status;
+  order.updatedAt = new Date();
+
+  await order.save();
+
+  return order;
 };

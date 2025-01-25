@@ -71,7 +71,16 @@ export const loginUser = async (loginDto: LoginUserDto) => {
  * @throws {HttpError} Throws an error if the user is not found.
  */
 export const updateUser = async (userId: string, updateDto: UpdateUserDto): Promise<IUser> => {
-  const updatedUser = await UserModel.findByIdAndUpdate(userId, updateDto, { new: true });
+  const { password, ...rest } = updateDto;
+
+  const updateData: Partial<IUser> = { ...rest };
+
+  // Hash the password if it's being updated
+  if (password) {
+    updateData.password = await bcrypt.hash(password, 10);
+  }
+
+  const updatedUser = await UserModel.findByIdAndUpdate(userId, updateData, { new: true });
 
   if (!updatedUser) {
     throw createHttpError(404, "User not found");

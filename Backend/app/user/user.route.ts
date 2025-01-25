@@ -41,4 +41,6 @@ router.post(
   userController.logoutUserHandler
 );
 
+router.post("/refresh-token", userController.refreshTokenHandler);
+
 export default router;

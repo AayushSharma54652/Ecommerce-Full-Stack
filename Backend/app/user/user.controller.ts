@@ -4,13 +4,9 @@ import * as userService from "./user.service";
 import { CreateUserDto, LoginUserDto, UpdateUserDto } from "./user.dto";
 import { createResponse } from "../common/helper/response.hepler";
 import { generateTokens } from "../common/helper/token.helper";
+import { verifyRefreshToken } from "../common/helper/token.helper";
+import UserModel from "./user.schema";
 
-/**
- * Registers a new user.
- * @param {Request} req - The HTTP request object containing user data.
- * @param {Response} res - The HTTP response object.
- * @returns {Promise<void>} Sends a response with the newly created user and access token.
- */
 export const registerUserHandler = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
     const { name, email, password, role }: CreateUserDto = req.body;
@@ -21,6 +17,9 @@ export const registerUserHandler = asyncHandler(
       email: newUser.email,
       role: newUser.role,
     });
+
+    // Store the refresh token in the user's record
+    await userService.updateUser(newUser._id.toString(), { refreshToken });
 
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
@@ -38,6 +37,7 @@ export const registerUserHandler = asyncHandler(
             role: newUser.role,
           },
           accessToken,
+          refreshToken, // Include refresh token in the response
         },
         "User registered successfully"
       )
@@ -45,16 +45,13 @@ export const registerUserHandler = asyncHandler(
   }
 );
 
-/**
- * Logs in an existing user.
- * @param {Request} req - The HTTP request object containing login credentials.
- * @param {Response} res - The HTTP response object.
- * @returns {Promise<void>} Sends a response with the user details and access token.
- */
 export const loginUserHandler = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
     const { email, password }: LoginUserDto = req.body;
     const { user, tokens } = await userService.loginUser({ email, password });
+
+    // Update the refresh token in the database
+    await userService.updateUser(user._id.toString(), { refreshToken: tokens.refreshToken });
 
     res.cookie("refreshToken", tokens.refreshToken, {
       httpOnly: true,
@@ -72,6 +69,7 @@ export const loginUserHandler = asyncHandler(
             role: user.role,
           },
           accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken, // Include refresh token in the response
         },
         "User logged in successfully"
       )
@@ -142,3 +140,42 @@ export const updateUserProfileHandler = asyncHandler(
     res.send(createResponse(updatedUser, "User profile updated successfully"));
   }
 );
+
+
+export const refreshTokenHandler = async (req: Request, res: Response): Promise<void> => {
+  // Get the refresh token from the headers
+  const refreshToken = req.headers['authorization']?.split(' ')[1]; // Assumes "Bearer <token>"
+
+  if (!refreshToken) {
+    res.status(401).json({ message: "Refresh token is required" });
+    return;
+  }
+
+  const userPayload = verifyRefreshToken(refreshToken);
+
+  if (!userPayload) {
+    res.status(401).json({ message: "Invalid or expired refresh token" });
+    return;
+  }
+
+  // Find the user and validate stored refresh token
+  const user = await UserModel.findById(userPayload._id);
+  if (!user || user.refreshToken !== refreshToken) {
+    res.status(403).json({ message: "Invalid refresh token" });
+    return;
+  }
+
+  // Generate new tokens
+  const { accessToken, refreshToken: newRefreshToken } = generateTokens({
+    _id: user._id.toString(),
+    email: user.email,
+    role: user.role,
+  });
+
+  // Update refresh token in database
+  user.refreshToken = newRefreshToken;
+  await user.save();
+
+  res.setHeader('Authorization', `Bearer ${newRefreshToken}`); // Optionally send the new refresh token in the headers
+  res.json({ accessToken, refreshToken: newRefreshToken });
+};

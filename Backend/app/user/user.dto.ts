@@ -4,7 +4,7 @@ export interface IUser extends BaseSchema {
   name: string;
   email: string;
   password: string;
-  refreshToken?: string;
+  refreshToken?: string; // Optional refresh token
   role: "CUSTOMER" | "ADMIN";
   active?: boolean;
   createdAt?: Date;
@@ -22,6 +22,7 @@ export interface UpdateUserDto {
   name?: string;
   email?: string;
   password?: string;
+  refreshToken?: string; // Add refreshToken to allow updates
   active?: boolean;
   role?: "CUSTOMER" | "ADMIN";
 }

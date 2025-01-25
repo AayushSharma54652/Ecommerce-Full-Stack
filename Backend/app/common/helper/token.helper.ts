@@ -18,7 +18,7 @@ export const generateTokens = (payload: TokenPayload) => {
   });
 
   const refreshToken = jwt.sign(cleanedPayload, process.env.REFRESH_TOKEN_SECRET!, {
-    expiresIn: "1d",
+    expiresIn: "7d", // Extend refresh token lifespan
   });
 
   return { accessToken, refreshToken };

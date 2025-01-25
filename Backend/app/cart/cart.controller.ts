@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { verifyAccessToken } from "../common/middleware/auth.middleware"; // Assuming you have this middleware for verifying access token
+import { verifyAccessToken } from "../common/helper/token.helper"; // Assuming you have this middleware for verifying access token
 import CartModel from "./cart.schema"; // Cart model
 import ProductModel from "../product/product.schema"; // Product model
 import { createResponse } from "../common/helper/response.hepler";
