@@ -8,8 +8,39 @@ import {
   registerFailure,
 } from "../store/reducers/authReducer";
 
-
 // Define types for products, users, and other responses
+
+interface OrderItem {
+  productId: {
+    _id: string;
+    name: string;
+    description: string;
+    price: number;
+    category: string;
+    stockQuantity: number;
+    images: string[];
+    isActive: boolean;
+    createdAt: string;
+    updatedAt: string;
+  };
+  quantity: number;
+  price: number;
+}
+
+interface OrderResponse {
+  data: {
+    _id: string;
+    user: string;
+    items: OrderItem[];
+    totalAmount: number;
+    status: string;
+    shippingAddress: string;
+    createdAt: string;
+    updatedAt: string;
+  };
+  message: string;
+  success: boolean;
+}
 interface Product {
   _id: string;
   name: string;
@@ -92,7 +123,7 @@ const baseQuery = fetchBaseQuery({
   },
 });
 
-const baseQueryWithReauth = async (args:any, api:any, extraOptions:any) => {
+const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
   // Execute the initial query
   let result = await baseQuery(args, api, extraOptions);
 
@@ -113,7 +144,8 @@ const baseQueryWithReauth = async (args:any, api:any, extraOptions:any) => {
       );
 
       if (refreshResult.data) {
-        const { accessToken, refreshToken: newRefreshToken } = refreshResult.data;
+        const { accessToken, refreshToken: newRefreshToken } =
+          refreshResult.data as { accessToken: string; refreshToken: string };
 
         // Store updated tokens in localStorage
         localStorage.setItem("accessToken", accessToken);
@@ -157,7 +189,6 @@ const baseQueryWithReauth = async (args:any, api:any, extraOptions:any) => {
   return result;
 };
 
-
 export const api = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithReauth,
@@ -166,87 +197,95 @@ export const api = createApi({
       query: () => "/products",
     }),
 
-    loginUser: builder.mutation<LoginResponse, { email: string; password: string }>(
-      {
-        query: (credentials) => ({
-          url: "/users/login",
-          method: "POST",
-          body: credentials,
-        }),
-        onQueryStarted: async (arg, { queryFulfilled, dispatch }) => {
-          try {
-            const { data } = await queryFulfilled;
-            if (data && data.data.accessToken) {
-              dispatch(
-                loginSuccess({
-                  user: data.data.user,
-                  accessToken: data.data.accessToken,
-                  refreshToken: data.data.refreshToken,
-                })
-              );
-              localStorage.setItem("accessToken", data.data.accessToken);
-              localStorage.setItem("refreshToken", data.data.refreshToken);
-            }
-          } catch (err) {
-            if (err instanceof Error) {
-              dispatch(loginFailure(err.message || "Login failed"));
-            } else {
-              dispatch(loginFailure("Login failed"));
-            }
+    loginUser: builder.mutation<
+      LoginResponse,
+      { email: string; password: string }
+    >({
+      query: (credentials) => ({
+        url: "/users/login",
+        method: "POST",
+        body: credentials,
+      }),
+      onQueryStarted: async (arg, { queryFulfilled, dispatch }) => {
+        try {
+          const { data } = await queryFulfilled;
+          if (data && data.data.accessToken) {
+            dispatch(
+              loginSuccess({
+                user: data.data.user,
+                accessToken: data.data.accessToken,
+                refreshToken: data.data.refreshToken,
+              })
+            );
+            localStorage.setItem("accessToken", data.data.accessToken);
+            localStorage.setItem("refreshToken", data.data.refreshToken);
           }
-        },
-      }
-    ),
+        } catch (err) {
+          if (err instanceof Error) {
+            dispatch(loginFailure(err.message || "Login failed"));
+          } else {
+            dispatch(loginFailure("Login failed"));
+          }
+        }
+      },
+    }),
 
     registerUser: builder.mutation<
-  RegisterResponse,
-  { name: string; email: string; role: string; password: string }
->({
-  query: (userDetails) => ({
-    url: "/users/register",
-    method: "POST",
-    body: userDetails,
-  }),
-  onQueryStarted: async (arg, { queryFulfilled, dispatch }) => {
-    try {
-      const { data } = await queryFulfilled;
-      if (data.success && data.data.accessToken) {
-        dispatch(
-          registerSuccess({
-            user: data.data.user,
-            accessToken: data.data.accessToken,
-            refreshToken: data.data.refreshToken
-          })
-        );
-        localStorage.setItem("accessToken", data.data.accessToken);
-        localStorage.setItem("refreshToken", data.data.refreshToken); // Store refreshToken
-      }
-    } catch (err) {
-      if (err instanceof Error) {
-        dispatch(registerFailure(err.message || "Registration failed"));
-      } else {
-        dispatch(registerFailure("Registration failed"));
-      }
-    }
-  },
-}),
+      RegisterResponse,
+      { name: string; email: string; role: string; password: string }
+    >({
+      query: (userDetails) => ({
+        url: "/users/register",
+        method: "POST",
+        body: userDetails,
+      }),
+      onQueryStarted: async (arg, { queryFulfilled, dispatch }) => {
+        try {
+          const { data } = await queryFulfilled;
+          if (data.success && data.data.accessToken) {
+            dispatch(
+              registerSuccess({
+                user: data.data.user,
+                accessToken: data.data.accessToken,
+                refreshToken: data.data.refreshToken,
+              })
+            );
+            localStorage.setItem("accessToken", data.data.accessToken);
+            localStorage.setItem("refreshToken", data.data.refreshToken); // Store refreshToken
+          }
+        } catch (err) {
+          if (err instanceof Error) {
+            dispatch(registerFailure(err.message || "Registration failed"));
+          } else {
+            dispatch(registerFailure("Registration failed"));
+          }
+        }
+      },
+    }),
 
-
+    createOrder: builder.mutation<OrderResponse, { shippingAddress: string }>({
+      query: (orderData) => ({
+        url: "/orders/create",
+        method: "POST",
+        body: orderData,
+      }),
+    }),
     getUserProfile: builder.query<ProfileResponse, void>({
       query: () => ({
         url: "/users/profile",
       }),
     }),
 
-    addToCart: builder.mutation<CartResponse, { productId: string; quantity: number }>(
-      {
-        query: ({ productId, quantity }) => ({
-          url: "/cart/add-to-cart",
-          method: "POST",
-          body: { productId, quantity },
-        }),
-      }
-    ),
+    addToCart: builder.mutation<
+      CartResponse,
+      { productId: string; quantity: number }
+    >({
+      query: ({ productId, quantity }) => ({
+        url: "/cart/add-to-cart",
+        method: "POST",
+        body: { productId, quantity },
+      }),
+    }),
 
     createProduct: builder.mutation<
       CreateProductResponse,
@@ -283,4 +322,5 @@ export const {
   useCreateProductMutation,
   useAddToCartMutation,
   useGetCartQuery,
+  useCreateOrderMutation
 } = api;

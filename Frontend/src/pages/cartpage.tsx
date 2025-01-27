@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Box,
   Typography,
@@ -9,6 +10,11 @@ import {
   Grid,
   IconButton,
   Skeleton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
 } from "@mui/material";
 import {
   RemoveShoppingCart as EmptyCartIcon,
@@ -17,17 +23,50 @@ import {
   Delete as DeleteIcon,
 } from "@mui/icons-material";
 import { motion } from "framer-motion";
-import { useGetCartQuery } from "../services/api";
+import { useGetCartQuery, useCreateOrderMutation } from "../services/api";
 import { useAppSelector } from "../store/store";
 
 const CartPage: React.FC = () => {
   const { isAuthenticated } = useAppSelector((state) => state.auth);
   const { data, error, isLoading } = useGetCartQuery();
+  const [createOrder] = useCreateOrderMutation();
+  const navigate = useNavigate();
 
-  const skeletonArray = new Array(3).fill(0); // Skeleton placeholders for 3 items
+  // New state for address dialog
+  const [openAddressDialog, setOpenAddressDialog] = useState(false);
+  const [shippingAddress, setShippingAddress] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const skeletonArray = new Array(3).fill(0);
   const cart = data?.data;
   const items = cart?.items || [];
   const totalPrice = cart?.totalPrice || 0;
+
+  // Handle checkout process
+  const handleCheckout = async () => {
+    setOpenAddressDialog(true);
+  };
+
+  // Handle address submission and order creation
+  const handleAddressSubmit = async () => {
+    if (!shippingAddress.trim()) {
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const response = await createOrder({ shippingAddress }).unwrap();
+      if (response.success) {
+        navigate("/order", { state: { orderData: response.data } });
+      }
+    } catch (error) {
+      console.error("Failed to create order:", error);
+      // You can add error handling UI here if needed
+    } finally {
+      setIsProcessing(false);
+      setOpenAddressDialog(false);
+    }
+  };
 
   if (!isAuthenticated) {
     return (
@@ -250,10 +289,7 @@ const CartPage: React.FC = () => {
 
         {items.length > 0 && (
           <Box sx={{ mt: 3, textAlign: "center" }}>
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
               <Button
                 variant="contained"
                 color="primary"
@@ -263,12 +299,47 @@ const CartPage: React.FC = () => {
                   py: 1.5,
                   borderRadius: 3,
                 }}
+                onClick={handleCheckout}
               >
                 Proceed to Checkout
               </Button>
             </motion.div>
           </Box>
         )}
+
+        {/* Address Dialog */}
+        <Dialog
+          open={openAddressDialog}
+          onClose={() => setOpenAddressDialog(false)}
+        >
+          <DialogTitle>Enter Shipping Address</DialogTitle>
+          <DialogContent>
+            <TextField
+              autoFocus
+              margin="dense"
+              label="Shipping Address"
+              type="text"
+              fullWidth
+              multiline
+              rows={3}
+              value={shippingAddress}
+              onChange={(e) => setShippingAddress(e.target.value)}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setOpenAddressDialog(false)}>Cancel</Button>
+            <Button
+              onClick={handleAddressSubmit}
+              disabled={!shippingAddress.trim() || isProcessing}
+            >
+              {isProcessing ? (
+                <CircularProgress size={24} />
+              ) : (
+                "Confirm"
+              )}
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Box>
     </Box>
   );
