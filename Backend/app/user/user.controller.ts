@@ -143,8 +143,7 @@ export const updateUserProfileHandler = asyncHandler(
 
 
 export const refreshTokenHandler = async (req: Request, res: Response): Promise<void> => {
-  // Get the refresh token from the headers
-  const refreshToken = req.headers['authorization']?.split(' ')[1]; // Assumes "Bearer <token>"
+  const { refreshToken } = req.body; // Expect the refresh token in the request body
 
   if (!refreshToken) {
     res.status(401).json({ message: "Refresh token is required" });
@@ -176,6 +175,12 @@ export const refreshTokenHandler = async (req: Request, res: Response): Promise<
   user.refreshToken = newRefreshToken;
   await user.save();
 
-  res.setHeader('Authorization', `Bearer ${newRefreshToken}`); // Optionally send the new refresh token in the headers
+  // Optionally, set the new refresh token as a cookie (can be removed if unnecessary)
+  res.cookie("refreshToken", newRefreshToken, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "strict",
+  });
+
   res.json({ accessToken, refreshToken: newRefreshToken });
 };

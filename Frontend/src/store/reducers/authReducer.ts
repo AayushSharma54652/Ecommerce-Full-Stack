@@ -8,6 +8,7 @@ interface AuthState {
     role: string;
   } | null;
   accessToken: string | null;
+  refreshToken: string | null;
   isAuthenticated: boolean;
   loading: boolean;
   error: string | null;
@@ -16,6 +17,7 @@ interface AuthState {
 const initialState: AuthState = {
   user: null,
   accessToken: localStorage.getItem("accessToken"),
+  refreshToken: localStorage.getItem("refreshToken"), // Initialize refreshToken from localStorage
   isAuthenticated: !!localStorage.getItem("accessToken"),
   loading: false,
   error: null,
@@ -25,56 +27,64 @@ const authSlice = createSlice({
   name: "auth",
   initialState,
   reducers: {
-    // Action to initiate login/signup process
     loginStart: (state) => {
       state.loading = true;
       state.error = null;
     },
 
-    // Action to handle successful login or signup
     loginSuccess: (
       state,
-      action: PayloadAction<{ user: AuthState["user"]; accessToken: string }>
+      action: PayloadAction<{
+        user: AuthState["user"];
+        accessToken: string;
+        refreshToken: string;
+      }>
     ) => {
       state.loading = false;
       state.isAuthenticated = true;
       state.user = action.payload.user;
       state.accessToken = action.payload.accessToken;
+      state.refreshToken = action.payload.refreshToken; // Save refreshToken in state
       localStorage.setItem("accessToken", action.payload.accessToken);
+      localStorage.setItem("refreshToken", action.payload.refreshToken); // Save refreshToken in localStorage
     },
 
-    // Action to handle failed login/signup
     loginFailure: (state, action: PayloadAction<string>) => {
       state.loading = false;
       state.error = action.payload;
       state.isAuthenticated = false;
     },
 
-    // Action to handle logout process
-    logout: (state) => {
-      state.user = null;
-      state.accessToken = null;
-      state.isAuthenticated = false;
-      localStorage.removeItem("accessToken");
-    },
-
-    // Action to handle registration success (after Sign Up)
     registerSuccess: (
       state,
-      action: PayloadAction<{ user: AuthState["user"]; accessToken: string }>
+      action: PayloadAction<{
+        user: AuthState["user"];
+        accessToken: string;
+        refreshToken: string;
+      }>
     ) => {
       state.loading = false;
       state.isAuthenticated = true;
       state.user = action.payload.user;
       state.accessToken = action.payload.accessToken;
+      state.refreshToken = action.payload.refreshToken; // Save refreshToken in state
       localStorage.setItem("accessToken", action.payload.accessToken);
+      localStorage.setItem("refreshToken", action.payload.refreshToken); // Save refreshToken in localStorage
     },
 
-    // Action to handle failed registration
     registerFailure: (state, action: PayloadAction<string>) => {
       state.loading = false;
       state.error = action.payload;
       state.isAuthenticated = false;
+    },
+
+    logout: (state) => {
+      state.user = null;
+      state.accessToken = null;
+      state.refreshToken = null; // Clear refreshToken from state
+      state.isAuthenticated = false;
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken"); // Clear refreshToken from localStorage
     },
   },
 });
